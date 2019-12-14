@@ -1,0 +1,29 @@
+! Copyright (C) 2019 J. Lucas
+! See http://factorcode.org/license.txt for BSD license.
+USING: kernel sequences combinators accessors locals assocs math hashtables ;
+
+IN: huffman
+
+TUPLE: huffman-node
+    weight element encoding left right ;
+
+: <huffman-node> ( element increment -- huffman )
+    f f f huffman-node boa ;
+
+:: huffman-increment-or-add ( element nodes increment -- )
+    nodes element of
+    [ element nodes [ [ increment + ] change-weight ] change-at ] 
+    [ increment element <huffman-node>
+      element nodes set-at ] if ;
+      
+:: origin-huffman-algo
+    ( nodes increment sequence --  nodes )
+    nodes
+    [ sequence increment huffman-increment-or-add ] each
+    sequence ;
+
+: origin-huffman-nodes ( sequence -- nodes )
+    dup length
+    [ 1 swap / ]
+    [ <hashtable> ] bi
+    origin-huffman-algo ;

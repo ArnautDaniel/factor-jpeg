@@ -1,0 +1,56 @@
+! Copyright (C) 2019 Your name.
+! See http://factorcode.org/license.txt for BSD license.
+USING: kernel sequences math locals math.constants math.functions  ;
+IN: slow-dct
+
+: matrix ( -- matrix )
+    { { 144 139 149 155 153 155 155 155 }
+      { 151 151 151 159 156 156 156 158 }
+      { 151 156 160 162 159 151 151 151 }
+      { 158 163 161 160 160 160 160 161 }
+      { 158 160 161 162 160 155 155 156 }
+      { 161 161 161 161 160 157 157 157 }
+      { 162 162 161 160 161 157 157 157 }
+      { 162 162 161 160 163 157 158 154 } } ;
+
+: matrix-x-cos ( x u -- n )
+    pi *
+    [ 2.0 * 1 + ] dip *
+    cos 16 / ;
+
+: matrix-uv-summand ( v u res -- res )
+    [ 0 = [ 1 2 sqrt / ] [ 1 ] if ] dip
+    [ 0 = [ 1 2 sqrt / ] [ 1 ] if ] 2dip
+    [ 1 4.0 / * * ] dip * ;
+
+:: matrix-elem ( y x v u matrix -- matrix-elem )
+    x matrix nth y swap nth
+    x u matrix-x-cos 
+    y v matrix-x-cos * *
+    ;
+    
+: matrix-y ( x v u matrix -- matrix-y-n )
+    [ matrix-elem ] 3curry curry
+    { 0 1 2 3 4
+      5 6 7 } swap
+    [ + ]
+    map-reduce ;
+
+: matrix-x ( v u matrix -- matrix-x-n )
+    [ matrix-y ] swap [ 2curry ] dip
+    swap [ + ]
+    map-reduce ;
+
+: matrix-v ( u matrix -- matrix-v-n )
+    [ [ 2dup ] dip matrix-x
+    matrix-uv-summand ] 2curry
+    { 0 1 2 3
+      4 5 6 7 } swap
+    map ;
+
+: matrix-dtc ( matrix -- matrix' )
+    [ matrix-v ] curry
+    { 0 1 2 3
+      4 5 6 7 } swap
+    map ;
+
