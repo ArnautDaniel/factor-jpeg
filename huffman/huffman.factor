@@ -1,34 +1,47 @@
 ! Copyright (C) 2019 A. Daniel
 ! See http://factorcode.org/license.txt for BSD license.
-USING: kernel sequences combinators accessors locals assocs math hashtables math.order sorting.slots bit-arrays classes formatting prettyprint ;
+USING: kernel sequences combinators accessors assocs math hashtables math.order
+sorting.slots classes formatting prettyprint ;
 
 IN: huffman
+
+! -------------------------------------
+! CLASSES -----------------------------
+! -------------------------------------
 
 TUPLE: huffman-node
     weight element encoding left right ;
 
-! For nodes which are the product of combinations
+! For nodes
 : <huffman-tnode> ( left right -- huffman )
-    huffman-node new
-    [ left<< ] [ swap >>right ] bi ;
+    huffman-node new [ left<< ] [ swap >>right ] bi ;
 
-! For regular nodes
+! For leafs
 : <huffman-node> ( element -- huffman )
     1 swap f f f huffman-node boa ;
 
+
+! --------------------------------------
+! INITIAL HASHTABLE --------------------
+! --------------------------------------
+
+<PRIVATE
+
+! Increment node if it already exists
+! Else make it and add it to the hash-table
 : huffman-gen ( element nodes  -- )
     2dup at
     [ [ [ 1 + ] change-weight ] change-at ] 
     [ [ dup <huffman-node> swap ] dip set-at ] if ;
 
-! Curry node-hash and inc.  Then each over the seq
+! Curry node-hash.  Then each over the seq
 ! to get the weighted values
 : (huffman) ( nodes seq --  nodes )
     dup [ [ huffman-gen ] curry each ] dip ;
 
-! Generate a priority queue from the hash-table
-: (huffman-queue) ( nodes -- queue )
-    values  ;
+! ---------------------------------------
+! TREE GENERATION -----------------------
+! ---------------------------------------
 
 : (huffman-weight) ( node1 node2 -- weight )
     [ weight>> ] dup bi* + ;
@@ -54,16 +67,20 @@ TUPLE: huffman-node
         (huffman-tree)
     ] if  ; recursive
 
+! --------------------------------------
+! ENCODING -----------------------------
+! --------------------------------------
+
 : (huffman-leaf?) ( node -- bool )
     [ left>>  huffman-node instance? ]
     [ right>> huffman-node instance? ] bi and not ;
 
-: (huffman-leaf) ( bit leaf -- )
+: (huffman-leaf) ( leaf bit -- )
     swap encoding<< ;
 
 DEFER: (huffman-encoding)
 
-! Probably a simpler way to do this
+! Recursively walk the nodes left and right
 : (huffman-node) ( bit nodes -- )
     [ 0 suffix ] [ 1 suffix ] bi
     [ [ left>> ] [ right>> ] bi ] 2dip
@@ -75,18 +92,44 @@ DEFER: (huffman-encoding)
     [ (huffman-leaf) ]
     [ (huffman-node) ] if ;
 
-! Holy hell batman
+PRIVATE>
+
+! -------------------------------
+! USER WORDS --------------------
+! -------------------------------
+
 : huffman-print ( nodes -- )
     "Element" "Weight" "Code" "\n%10s\t%10s\t%6s\n" printf
     { { weight>> >=< } } sort-by
     [  [ encoding>> ] [ element>> ] [ weight>> ] tri
-       "%8c\t%7d\t\t" printf  pprint "\n" printf 
-    ] each ;
+       "%8c\t%7d\t\t" printf  pprint "\n" printf ] each ;
 
 : huffman ( sequence -- nodes )
-    H{ } clone
-    (huffman) (huffman-queue) dup
-    ! save a copy of the nodes before encoding
-    ! so we can easily get it back
-    (huffman-tree) first { } (huffman-encoding) ;
+    H{ } clone (huffman) values 
+    [ (huffman-tree) first { }
+      (huffman-encoding) ] keep ;
 
+! ---------------------------------
+! USAGE ---------------------------
+! ---------------------------------
+
+! { 1 2 3 4 } huffman huffman-print
+! "this is an example of a huffman tree" huffman huffman-print
+
+! Element   Weight	  Code
+!      	      7		{ 0 0 0 }
+!     a	      4		{ 1 1 1 }
+!     e	      4		{ 1 1 0 }
+!     f	      3		{ 0 0 1 0 }
+!     h	      2		{ 1 0 1 0 }
+!     i	      2		{ 0 1 0 1 }
+!     m	      2		{ 0 1 0 0 }
+!     n	      2		{ 0 1 1 1 }
+!     s	      2		{ 0 1 1 0 }
+!     t	      2		{ 0 0 1 1 }
+!     l	      1		{ 1 0 1 1 1 }
+!     o	      1		{ 1 0 1 1 0 }
+!     p	      1		{ 1 0 0 0 1 }
+!     r	      1		{ 1 0 0 0 0 }
+!     u	      1		{ 1 0 0 1 1 }
+!     x	      1		{ 1 0 0 1 0 }
