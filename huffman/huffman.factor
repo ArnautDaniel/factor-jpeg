@@ -59,7 +59,7 @@ TUPLE: huffman-node
 ! left with the root node
 : (huffman-tree) ( nodes -- tree )
     dup rest empty?
-    [ ] [
+    [ first ] [
         { { weight>> <=> } } sort-by
         [ rest rest ] [ first ]
         [ second ] tri
@@ -106,8 +106,7 @@ PRIVATE>
 
 : huffman ( sequence -- nodes )
     H{ } clone (huffman) values 
-    [ (huffman-tree) first { }
-      (huffman-encoding) ] keep ;
+    [ (huffman-tree) { } (huffman-encoding) ] keep ;
 
 ! ---------------------------------
 ! USAGE ---------------------------
