@@ -1,12 +1,18 @@
 ! Copyright (C) 2019 A. Daniel
 ! See http://factorcode.org/license.txt for BSD license.
-USING: kernel sequences combinators io.files io.encodings.binary grouping io.binary math.parser math assocs sequences.deep splitting ;
+USING: kernel sequences combinators io.files io.encodings.binary grouping io.binary math.parser math assocs sequences.deep splitting sequences.extras ;
 IN: jpeg-marker
 
 ! Bad code.  Going to put it on github to keep it organized anyway.
 ! Slow.  Need to rewrite marker detection to handle stuff bytes 0xFF00
 
 ! TODO: Add reference material because this stuff is so poorly explained everywhere
+
+TUPLE: jpg-header
+    quant-table huffman scan ;
+
+: <jpg-header> ( quant huffman scan -- jpg-header )
+    jpg-header boa ;
 
 : jpg-markers ( -- markers )
     { { "c0" "[HUFFMAN/Non-Diff] Baseline DCT"                    } 
@@ -51,12 +57,25 @@ IN: jpeg-marker
 : (read-jpg-contents) ( path -- contents )
     binary file-contents 1 group flatten [ >hex ] map ;
 
+! Split markers
+! Find the first 0xFF
+! If it is followed by 0x00 then ignore it
+! If it is 
 ! Simplify
+
+: (marker) ( index seq -- val/f )
+    [ 1 + ] dip nth jpg-markers at ;
+
 : (markers-from-seq) ( seq -- seq' )
-    [ "ff" = ] split-when
+    dup [ "ff" = ] find-all [ first ] map ! Generate indexes of 0xFF
+    swap [ (marker) ] curry filter ;
+    
+: (marker-split) ( seq -- seq' )
+    dup (markers-from-seq) split-indices ;
+
+: (markers) ( seq -- seq' )
+    (marker-split)
     [ empty? ] reject
-    [ first jpg-markers at ] filter
-    dup
-    [ first jpg-markers at ] map swap
-    [ rest ] map zip
-    [ second empty? ] reject ; ! Remove SOS and EOS
+    [ rest ] map
+    [ [ first jpg-markers at ] map ]
+    [ [ rest ] map ] bi zip but-last ! Remove EOS ;
