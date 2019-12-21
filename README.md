@@ -7,11 +7,23 @@ jpeg encoding/decoder native to factor
 
 dct : working but needs to be written again
 
-huffman: working -- seems pretty alright
+huffman: working -- seems pretty alright.  Apparently not necessary for decoding
 
 quantizier: working 
 
-marker: very naive, kind of working
+marker: very naive, kind of working.  Can mostly do Huffman tables and DQT's now
+
+TODO:
+
+Decode DCT's 
+
+Decode scan with huffman tables
+
+Reverse quantization
+
+Run IDCT on the matrices
+
+Test with raylib
 
 ### factor-jpeg1: The Standard Implementation
 
