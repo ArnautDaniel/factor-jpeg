@@ -1,6 +1,6 @@
 ! Copyright (C) 2019 A. Daniel
 ! See http://factorcode.org/license.txt for BSD license.
-USING: kernel sequences combinators io.files io.encodings.binary grouping io.binary math.parser math assocs sequences.deep splitting sequences.extras ;
+USING: kernel sequences combinators io.files io.encodings.binary grouping io.binary math.parser math assocs sequences.deep splitting sequences.extras locals math.bitwise ;
 IN: jpeg-marker
 
 ! Bad code.  Going to put it on github to keep it organized anyway.
@@ -78,4 +78,69 @@ TUPLE: jpg-header
     [ empty? ] reject
     [ rest ] map
     [ [ first jpg-markers at ] map ]
-    [ [ rest ] map ] bi zip but-last ! Remove EOS ;
+    [ [ rest ] map ] bi zip but-last ! Remove EOS
+    ;
+
+: (dht-class) ( n -- class )
+    { { "0"  [ "DC/Y" ] }
+      { "10" [ "AC/Y" ] }
+      { "1" [ "DC/CrCb" ] }
+      { "11" [ "AC/CrCb" ] } } case ;
+
+TUPLE: dht
+    class codes ;
+
+: <dht> ( class codes -- dht )
+    dht boa ;
+
+: (generate-huffman-codes) ( huff-seq n bits -- seq )
+    [ [ + ] dip 1 + clear-bit >bin { } 2sequence ] 2curry
+    map-index ;
+
+: (huffman-slicemap) ( slices -- coded-seq )
+    [ dup on-bits 1 shift swap
+      (generate-huffman-codes) ] map-index ;
+
+: (generate-huffman-tree) ( bit-seq huff-seq -- seq )
+    swap dup empty?
+    [ 2drop { } ]
+    [ [ first ] [ rest ] bi
+      [ hex> cut-slice ] dip swap (generate-huffman-tree)
+      swap prefix ] if ; recursive
+    
+: (decode-huffman) ( huff-seq -- decode-seq )
+    rest rest ! We don't need length
+    [ first (dht-class) ]
+    [ { 16 } split-indices
+      first2 (generate-huffman-tree) ] bi
+    <dht> ;
+
+: test ( -- seq )
+    "simple.jpg" (read-jpg-contents) (markers) fourth second
+    rest rest rest { 16 } split-indices first2
+    (generate-huffman-tree) ;
+
+! Ready for the first thing to CLEARLY document huff table
+! encodings?  Ready?
+
+! First two bytes = LENGTH of the payload (including the 2 bytes
+! used to denote the length)
+! The byte after that is the DHT Class
+! 0x00  = DC table for Y
+! 0x10  = AC table for Y
+! 0x01  = DC table for Cb & Cr
+! 0x11  = AC table for Cb & Cr
+! After those 3 bytes are 16 bytes that describe how many codes
+! there are for a particular huffman code length.
+
+! After those 16 bytes are the actual codes. Which get matched to
+! the number of code lengths.  So imagine if earlier we read from
+! the first of the 16 bytes and got a 2.  That means there are 2
+! codes which are 2 huffman bits in length. So the first 2 codes we
+! read should be the highest weight in our HUFFMAN tree.
+
+! Looking at it from another angle here is the general scheme
+! { Length 2/bytes} { Class 1/byte } { HUFFBITS 16/bytes }
+! { HUFFCODES Length-19/bytes }
+
+     
