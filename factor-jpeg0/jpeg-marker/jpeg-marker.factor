@@ -1,12 +1,16 @@
 ! Copyright (C) 2019 A. Daniel
 ! See http://factorcode.org/license.txt for BSD license.
-USING: kernel sequences combinators io.files io.encodings.binary grouping io.binary math.parser math assocs sequences.deep splitting sequences.extras locals math.bitwise ;
+USING: kernel sequences combinators io.files io.encodings.binary grouping io.binary math.parser math assocs sequences.deep splitting sequences.extras locals math.bitwise namespaces ;
 IN: jpeg-marker
 
 ! Bad code.  Going to put it on github to keep it organized anyway.
-! Slow.  Need to rewrite marker detection to handle stuff bytes 0xFF00
+! Hopefully it'll get better.
 
-! TODO: Add reference material because this stuff is so poorly explained everywhere
+! Slow.  Need to rewrite marker detection to handle stuff bytes 0xFF00: DONE: FIXED STUFF BYTES
+
+! TODO: Add reference material because this stuff is so poorly explained everywhere 
+
+! This version reads the whole file in first, which is slow as balls.
 
 TUPLE: jpg-header
     quant-table huffman scan ;
@@ -93,13 +97,21 @@ TUPLE: dht
 : <dht> ( class codes -- dht )
     dht boa ;
 
-: (generate-huffman-codes) ( huff-seq n bits -- seq )
-    [ [ + ] dip 1 + clear-bit >bin { } 2sequence ] 2curry
-    map-index ;
+! The 1+ and 1- map in the next word are hacks
+! to prevent a 0 value from screwing everything up
+! Should probably be fixed.
+: (generate-huffman-codes) ( slice code -- code-lst )
+    [ 1 + + ] curry map ;
 
+! Absolutely disgusting
 : (huffman-slicemap) ( slices -- coded-seq )
-    [ dup on-bits 1 shift swap
-      (generate-huffman-codes) ] map-index ;
+    [let 0 :> code!
+     [ length <iota> code (generate-huffman-codes)
+       dup dup empty?
+       [ [ 1 - ] map nip ]
+       [ last 1 shift code!
+         [ 1 - ] map ] if ] map
+    ] ;
 
 : (generate-huffman-tree) ( bit-seq huff-seq -- seq )
     swap dup empty?
@@ -107,18 +119,36 @@ TUPLE: dht
     [ [ first ] [ rest ] bi
       [ hex> cut-slice ] dip swap (generate-huffman-tree)
       swap prefix ] if ; recursive
-    
+
+! Filthy
 : (decode-huffman) ( huff-seq -- decode-seq )
     rest rest ! We don't need length
     [ first (dht-class) ]
-    [ { 16 } split-indices
-      first2 (generate-huffman-tree) ] bi
+    [ rest { 16 } split-indices
+      first2 (generate-huffman-tree)
+    dup flatten swap (huffman-slicemap) flatten zip ] bi
     <dht> ;
 
+: (decode-huffman-tables) ( header -- tables )
+    [ first "Define Huffman table(s)" = ] filter
+    [ second (decode-huffman) ] map ;
+
+: (decode-dqt-table) ( dqt -- dqt' )
+    rest rest rest ;
+
+: (decode-dqt) ( header -- qts )
+    [ first "Define quantization table(s)" = ] filter
+    [ second (decode-dqt-table) ] map ;
+
+: (decode-jpg) ( path -- jpg )
+    (read-jpg-contents) (markers)
+    { [ (decode-huffman-tables) ]
+      [ (decode-dqt) ] } cleave
+    append ;
+
 : test ( -- seq )
-    "simple.jpg" (read-jpg-contents) (markers) fourth second
-    rest rest rest { 16 } split-indices first2
-    (generate-huffman-tree) ;
+    "simple.jpg" (read-jpg-contents)
+    (markers) (decode-huffman-tables) ;
 
 ! Ready for the first thing to CLEARLY document huff table
 ! encodings?  Ready?
