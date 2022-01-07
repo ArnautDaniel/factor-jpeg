@@ -1,4 +1,4 @@
-! Copyright (C) 2019 A. Daniel
+! Copyright (C) 2019 J. Lucas
 ! See http://factorcode.org/license.txt for BSD license.
 USING: kernel sequences combinators accessors assocs math hashtables math.order
 sorting.slots classes formatting prettyprint ;
